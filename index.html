@@ -2,18 +2,39 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Todo MVC</title>
+  <title>QCM JavaScript</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div id="app">
-    <h1>Todo List</h1>
-    <div id="form-container">
-      <input type="text" id="txt-todo" placeholder="Ajouter une tâche...">
-      <button id="btn-add" type="button">Ajouter</button>
+
+    <!-- Ecran accueil -->
+    <div id="ecran-accueil">
+      <h1>QCM JavaScript</h1>
+      <p>5 questions — Bonne chance !</p>
+      <input type="text" id="txt-nom" placeholder="Ton prénom...">
+      <button id="btn-commencer">Commencer</button>
     </div>
-    <ul id="todo-list"></ul>
-    <p id="counter">0 tâche(s)</p>
+
+    <!-- Ecran question -->
+    <div id="ecran-question" class="hidden">
+      <div id="progression">Question <span id="num-question">1</span> / 5</div>
+      <div id="barre-progression"><div id="barre-fill"></div></div>
+      <h2 id="txt-question"></h2>
+      <div id="choix-container"></div>
+      <button id="btn-suivant" class="hidden">Question suivante</button>
+    </div>
+
+    <!-- Ecran resultat -->
+    <div id="ecran-resultat" class="hidden">
+      <h1 id="titre-resultat"></h1>
+      <p id="txt-score"></p>
+      <div id="recap-container"></div>
+      <h2>Classement</h2>
+      <ul id="classement"></ul>
+      <button id="btn-rejouer">Rejouer</button>
+    </div>
+
   </div>
   <script src="script.js"></script>
 </body>

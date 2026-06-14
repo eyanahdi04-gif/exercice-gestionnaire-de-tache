@@ -1,223 +1,240 @@
-// ==========================================
-// TEST DE CONNEXION INITIAL
-// ==========================================
-console.log("Frontend chargé !");
+// ============================================
+// VARIABLES GLOBALES
+// ============================================
 
-fetch("http://localhost:3000/ping")
-  .then((response) => response.json())
-  .then((data) => console.log(data))
-  .catch((error) => console.error(error));
+let questions = []
+let questionIndex = 0
+let score = 0
+let nomJoueur = ""
+let reponsesJoueur = []
 
-// ==========================================
-// PATTERN OBSERVER (Le système d'alerte)
-// ==========================================
+// ============================================
+// RECUPERATION DES ELEMENTS DU DOM
+// ============================================
 
-// Modèle pour les Observateurs (ex: la View) qui attendent des changements
-class Observer {
-  notify() {
-    throw new Error("Tu dois implémenter notify() !");
+const ecranAccueil  = document.getElementById("ecran-accueil")
+const ecranQuestion = document.getElementById("ecran-question")
+const ecranResultat = document.getElementById("ecran-resultat")
+
+const txtNom        = document.getElementById("txt-nom")
+const btnCommencer  = document.getElementById("btn-commencer")
+const btnSuivant    = document.getElementById("btn-suivant")
+const btnRejouer    = document.getElementById("btn-rejouer")
+
+const numQuestion   = document.getElementById("num-question")
+const txtQuestion   = document.getElementById("txt-question")
+const choixContainer = document.getElementById("choix-container")
+const barreFill     = document.getElementById("barre-fill")
+
+const titreResultat = document.getElementById("titre-resultat")
+const txtScore      = document.getElementById("txt-score")
+const recapContainer = document.getElementById("recap-container")
+const classementEl  = document.getElementById("classement")
+
+// ============================================
+// FONCTIONS UTILITAIRES
+// ============================================
+
+// affiche un ecran, cache les autres
+function afficherEcran(ecran) {
+  ecranAccueil.classList.add("hidden")
+  ecranQuestion.classList.add("hidden")
+  ecranResultat.classList.add("hidden")
+  ecran.classList.remove("hidden")
+}
+
+// ============================================
+// CHARGEMENT DES QUESTIONS
+// ============================================
+
+async function chargerQuestions() {
+  const response = await fetch("http://localhost:3000/questions")
+  const data = await response.json()
+  questions = data
+}
+
+// ============================================
+// AFFICHAGE D UNE QUESTION
+// ============================================
+
+function afficherQuestion() {
+  const q = questions[questionIndex]
+
+  // met a jour la progression
+  numQuestion.textContent = questionIndex + 1
+  barreFill.style.width = `${((questionIndex) / questions.length) * 100}%`
+
+  // affiche la question
+  txtQuestion.textContent = q.question
+
+  // cree les boutons de choix
+  choixContainer.innerHTML = ""
+  const choix = [q.choix1, q.choix2, q.choix3, q.choix4]
+
+  choix.forEach((texte, index) => {
+    const btn = document.createElement("button")
+    btn.textContent = texte
+    btn.classList.add("choix-btn")
+
+    // quand l utilisateur clique sur un choix
+    btn.addEventListener("click", () => {
+      // desactive tous les boutons
+      document.querySelectorAll(".choix-btn").forEach((b) => {
+        b.disabled = true
+      })
+
+      const bonneReponse = q.bonne_reponse - 1
+
+      // colorie la bonne reponse en vert
+      document.querySelectorAll(".choix-btn")[bonneReponse].classList.add("correct")
+
+      // colorie en rouge si mauvaise reponse
+      if (index !== bonneReponse) {
+        btn.classList.add("incorrect")
+      } else {
+        score++
+      }
+
+      // memorise la reponse du joueur
+      reponsesJoueur.push({
+        question: q.question,
+        reponseJoueur: texte,
+        bonneReponse: choix[bonneReponse],
+        correct: index === bonneReponse
+      })
+
+      // affiche le bouton suivant
+      btnSuivant.classList.remove("hidden")
+    })
+
+    choixContainer.appendChild(btn)
+  })
+
+  btnSuivant.classList.add("hidden")
+}
+
+// ============================================
+// QUESTION SUIVANTE
+// ============================================
+
+function questionSuivante() {
+  questionIndex++
+
+  if (questionIndex < questions.length) {
+    afficherQuestion()
+  } else {
+    // toutes les questions sont repondues
+    finirQcm()
   }
 }
 
-// Gestionnaire qui maintient la liste des abonnés et les alerte
-class Notifier {
-  #observers = []; // Liste privée des abonnés
+// ============================================
+// FIN DU QCM
+// ============================================
 
-  // S'abonner aux alertes
-  addObserver(observer) {
-    this.#observers.push(observer);
-  }
+async function finirQcm() {
+  // enregistre le score dans la base
+  await fetch("http://localhost:3000/scores", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      nom: nomJoueur,
+      score: score,
+      total: questions.length
+    })
+  })
 
-  // Alerter tout le monde
-  notify() {
-    this.#observers.forEach((observer) => observer.notify());
-  }
+  // affiche l ecran de resultat
+  afficherResultat()
 }
 
-// ==========================================
-// MODELE DE DONNÉES
-// ==========================================
+// ============================================
+// AFFICHAGE DU RESULTAT
+// ============================================
 
-// Structure propre pour représenter un seul Todo
-class Todo {
-  #id;
-  #text;
-  #done;
+async function afficherResultat() {
+  afficherEcran(ecranResultat)
 
-  constructor(id, text, done) {
-    this.#id = id;
-    this.#text = text;
-    this.#done = done === 1 || done === true; // Convertit en vrai/faux
+  // titre selon le score
+  if (score === questions.length) {
+    titreResultat.textContent = "Parfait !"
+  } else if (score >= questions.length / 2) {
+    titreResultat.textContent = "Bien joué !"
+  } else {
+    titreResultat.textContent = "Peut mieux faire..."
   }
 
-  // Permet de lire les variables privées à l'extérieur
-  get id()   { return this.#id; }
-  get text() { return this.#text; }
-  get done() { return this.#done; }
+  txtScore.textContent = `${nomJoueur} — ${score} / ${questions.length} bonnes réponses`
+
+  // recap de toutes les reponses
+  recapContainer.innerHTML = ""
+  reponsesJoueur.forEach((r) => {
+    const div = document.createElement("div")
+    div.classList.add("recap-item")
+    div.classList.add(r.correct ? "ok" : "ko")
+    div.innerHTML = `
+      <b>${r.question}</b><br>
+      Ta réponse : ${r.reponseJoueur}
+      ${!r.correct ? `<br>Bonne réponse : ${r.bonneReponse}` : ""}
+    `
+    recapContainer.appendChild(div)
+  })
+
+  // charge et affiche le classement
+  const response = await fetch("http://localhost:3000/scores")
+  const scores = await response.json()
+
+  classementEl.innerHTML = ""
+  scores.forEach((s, index) => {
+    const li = document.createElement("li")
+    li.innerHTML = `
+      <span>${index + 1}. ${s.nom}</span>
+      <span>${s.score}/${s.total} — ${s.date}</span>
+    `
+    classementEl.appendChild(li)
+  })
 }
 
-// ==========================================
-// CONTROLLER (Gestion des données et API)
-// ==========================================
+// ============================================
+// EVENEMENTS
+// ============================================
 
-// Le Controller hérite de Notifier pour pouvoir alerter la View
-class Controller extends Notifier {
-  #todos = []; // Liste privée des todos sur le client
-
-  get todos() { return this.#todos; }
-
-  // Charger les todos depuis le serveur
-  async loadTodos() {
-    const response = await fetch("http://localhost:3000/todos");
-    const data = await response.json();
-    // Transforme le JSON reçu en vrais objets "Todo"
-    this.#todos = data.map((t) => new Todo(t.id, t.text, t.done));
-    this.notify(); // Alerte la View pour mettre à jour l'écran
+// bouton commencer
+btnCommencer.addEventListener("click", async () => {
+  const nom = txtNom.value.trim()
+  if (nom === "") {
+    alert("Entre ton prénom !")
+    return
   }
 
-  // Ajouter un todo sur le serveur
-  async addTodo(text) {
-    if (text.trim() === "") return;
+  nomJoueur = nom
+  questionIndex = 0
+  score = 0
+  reponsesJoueur = []
 
-    const response = await fetch("http://localhost:3000/todos", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text })
-    });
+  await chargerQuestions()
+  afficherEcran(ecranQuestion)
+  afficherQuestion()
+})
 
-    const data = await response.json();
-    // Ajoute le nouveau todo créé à notre liste locale
-    this.#todos.push(new Todo(data.id, data.text, data.done));
-    this.notify(); // Alerte la View
-  }
+// bouton question suivante
+btnSuivant.addEventListener("click", () => {
+  questionSuivante()
+})
 
-  // Supprimer un todo sur le serveur
-  async deleteTodo(id) {
-    await fetch(`http://localhost:3000/todos/${id}`, {
-      method: "DELETE"
-    });
+// bouton rejouer
+btnRejouer.addEventListener("click", () => {
+  questionIndex = 0
+  score = 0
+  reponsesJoueur = []
+  txtNom.value = ""
+  afficherEcran(ecranAccueil)
+})
 
-    // Retire le todo de notre liste locale
-    this.#todos = this.#todos.filter((t) => t.id !== id);
-    this.notify(); // Alerte la View
-  }
+// ============================================
+// LANCEMENT
+// ============================================
 
-  // Cocher / Décocher un todo sur le serveur
-  async toggleTodo(id) {
-    const todo = this.#todos.find((t) => t.id === id);
-    if (!todo) return;
-
-    const response = await fetch(`http://localhost:3000/todos/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ done: !todo.done }) // Inverse l'état actuel
-    });
-
-    const data = await response.json();
-    // Remplace l'ancien todo par le nouveau mis à jour
-    this.#todos = this.#todos.map((t) =>
-      t.id === id ? new Todo(data.id, data.text, data.done) : t
-    );
-    this.notify(); // Alerte la View
-  }
-}
-
-// ==========================================
-// VIEW (Gestion de l'affichage HTML)
-// ==========================================
-
-// La View hérite d'Observer pour écouter le Controller
-class View extends Observer {
-  #controller;
-
-  constructor(controller) {
-    super();
-    this.#controller = controller;
-
-    // S'abonner aux changements du controller
-    this.#controller.addObserver(this);
-
-    // Événement clic sur le bouton Ajouter
-    const btnAdd = document.querySelector("#btn-add");
-    btnAdd.addEventListener("click", () => this.#onClickAdd());
-
-    // Événement touche Entrée dans la barre de saisie
-    const input = document.querySelector("#txt-todo");
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") this.#onClickAdd();
-    });
-  }
-
-  // Reçu quand le Controller dit "j'ai modifié mes données !"
-  notify() {
-    this.#render(); // Relance le dessin de la liste
-  }
-
-  // Action du bouton ajouter
-  #onClickAdd() {
-    const input = document.querySelector("#txt-todo");
-    const text = input.value;
-    this.#controller.addTodo(text);
-    input.value = ""; // Vide l'input
-  }
-
-  // Redessiner toute la liste dans le HTML
-  #render() {
-    const list = document.querySelector("#todo-list");
-    const counter = document.querySelector("#counter");
-    const todos = this.#controller.todos;
-
-    // Vider l'ancienne liste HTML pour éviter les doublons
-    list.innerHTML = "";
-
-    // Créer un <li> complet pour chaque todo
-    todos.forEach((todo) => {
-      const li = document.createElement("li");
-      li.classList.add("todo-item");
-      if (todo.done) li.classList.add("done");
-
-      // 1. Créer la Case à cocher (Checkbox)
-      const checkbox = document.createElement("input");
-      checkbox.type = "checkbox";
-      checkbox.checked = todo.done;
-      checkbox.addEventListener("change", () => {
-        this.#controller.toggleTodo(todo.id);
-      });
-
-      // 2. Créer le Texte de la tâche
-      const span = document.createElement("span");
-      span.textContent = todo.text;
-
-      // 3. Créer le Bouton supprimer
-      const btnDelete = document.createElement("button");
-      btnDelete.textContent = "❌";
-      btnDelete.classList.add("btn-delete");
-      btnDelete.addEventListener("click", () => {
-        this.#controller.deleteTodo(todo.id);
-      });
-
-      // Assembler les éléments dans le <li>
-      li.appendChild(checkbox);
-      li.appendChild(span);
-      li.appendChild(btnDelete);
-
-      // Ajouter le <li> dans la liste <ul> du HTML
-      list.appendChild(li);
-    });
-
-    // Mettre à jour le compteur de tâches restantes
-    const remaining = todos.filter((t) => !t.done).length;
-    counter.textContent = `${remaining} tâche(s) restante(s)`;
-  }
-}
-
-// ==========================================
-// DÉMARRAGE DE L'APPLICATION
-// ==========================================
-window.addEventListener("load", async () => {
-  const controller = new Controller();
-  const view = new View(controller);
-
-  // Charger les todos existants au démarrage de la page
-  await controller.loadTodos();
-});
+window.addEventListener("load", () => {
+  afficherEcran(ecranAccueil)
+})

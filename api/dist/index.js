@@ -6,74 +6,79 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const fastify_1 = __importDefault(require("fastify"));
 const better_sqlite3_1 = __importDefault(require("better-sqlite3"));
 const app = (0, fastify_1.default)();
-const db = new better_sqlite3_1.default("todos.db");
+const db = new better_sqlite3_1.default("qcm.db");
+// base de donnees
 db.exec(`
-  CREATE TABLE IF NOT EXISTS todos (
+  CREATE TABLE IF NOT EXISTS questions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    text TEXT NOT NULL,
-    done INTEGER NOT NULL DEFAULT 0
-  )
+    question TEXT NOT NULL,
+    choix1 TEXT NOT NULL,
+    choix2 TEXT NOT NULL,
+    choix3 TEXT NOT NULL,
+    choix4 TEXT NOT NULL,
+    bonne_reponse INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS scores (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nom TEXT NOT NULL,
+    score INTEGER NOT NULL,
+    total INTEGER NOT NULL,
+    date TEXT NOT NULL
+  );
 `);
+// insere les questions si la table est vide
+const count = db.prepare("SELECT COUNT(*) as count FROM questions").get();
+if (count.count === 0) {
+    const insert = db.prepare(`
+    INSERT INTO questions (question, choix1, choix2, choix3, choix4, bonne_reponse)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `);
+    insert.run("Quel mot clé utilise-t-on pour déclarer une constante en JavaScript ?", "var", "let", "const", "define", 3);
+    insert.run("Quelle méthode permet d'ajouter un élément à la fin d'un tableau ?", "push()", "pop()", "shift()", "splice()", 1);
+    insert.run("Qu'est-ce que le DOM ?", "Un langage de programmation", "La représentation de la page HTML en mémoire", "Un framework JavaScript", "Une base de données", 2);
+    insert.run("Quel opérateur compare la valeur ET le type en JavaScript ?", "==", "!=", "===", "=>", 3);
+    insert.run("Comment sélectionner un élément par son id en JavaScript ?", "document.getElement('id')", "document.querySelector('.id')", "document.querySelector('#id')", "document.find('#id')", 3);
+}
+// CORS
 app.addHook("onRequest", async (request, reply) => {
     reply.header("Access-Control-Allow-Origin", "*");
-    reply.header("Access-Control-Allow-Methods", "GET, POST, DELETE, PATCH, OPTIONS");
+    reply.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
     reply.header("Access-Control-Allow-Headers", "Content-Type");
 });
 app.options("/*", async (request, reply) => {
     reply.send();
 });
-app.get("/ping", async (request, reply) => {
-    return { message: "pong" };
+// GET /questions — retourne toutes les questions
+app.get("/questions", async (request, reply) => {
+    const questions = db.prepare("SELECT * FROM questions").all();
+    return questions;
 });
-app.get("/todos", async (request, reply) => {
-    const todos = db.prepare("SELECT * FROM todos").all();
-    return todos;
-});
-app.post("/todos", async (request, reply) => {
+// POST /scores — enregistre un score
+app.post("/scores", async (request, reply) => {
     const body = request.body;
-    if (!body.text || body.text.trim() === "") {
+    if (!body.nom || body.nom.trim() === "") {
         reply.code(400);
-        return { error: "Le texte est obligatoire" };
+        return { error: "Le nom est obligatoire" };
     }
+    const date = new Date().toLocaleDateString("fr-FR");
     const result = db
-        .prepare("INSERT INTO todos (text, done) VALUES (?, 0)")
-        .run(body.text.trim());
-    const newTodo = db
-        .prepare("SELECT * FROM todos WHERE id = ?")
+        .prepare("INSERT INTO scores (nom, score, total, date) VALUES (?, ?, ?, ?)")
+        .run(body.nom.trim(), body.score, body.total, date);
+    const newScore = db
+        .prepare("SELECT * FROM scores WHERE id = ?")
         .get(result.lastInsertRowid);
     reply.code(201);
-    return newTodo;
+    return newScore;
 });
-app.delete("/todos/:id", async (request, reply) => {
-    const { id } = request.params;
-    const todo = db
-        .prepare("SELECT * FROM todos WHERE id = ?")
-        .get(Number(id));
-    if (!todo) {
-        reply.code(404);
-        return { error: "Todo introuvable" };
-    }
-    db.prepare("DELETE FROM todos WHERE id = ?").run(Number(id));
-    return { message: "Todo supprimé" };
+// GET /scores — retourne le classement
+app.get("/scores", async (request, reply) => {
+    const scores = db
+        .prepare("SELECT * FROM scores ORDER BY score DESC LIMIT 10")
+        .all();
+    return scores;
 });
-app.patch("/todos/:id", async (request, reply) => {
-    const { id } = request.params;
-    const body = request.body;
-    const todo = db
-        .prepare("SELECT * FROM todos WHERE id = ?")
-        .get(Number(id));
-    if (!todo) {
-        reply.code(404);
-        return { error: "Todo introuvable" };
-    }
-    db.prepare("UPDATE todos SET done = ? WHERE id = ?")
-        .run(body.done ? 1 : 0, Number(id));
-    const updated = db
-        .prepare("SELECT * FROM todos WHERE id = ?")
-        .get(Number(id));
-    return updated;
-});
-// DÉMARRAGE — toujours en dernier
+// DEMARRAGE
 app.listen({ port: 3000 }, (err, address) => {
     if (err) {
         console.error(err);
