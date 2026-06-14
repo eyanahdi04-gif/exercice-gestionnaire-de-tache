@@ -1,0 +1,22 @@
+on vas tster les requet post get delete patch sur oglet du console
+
+
+fetch:
+fetch("http://localhost:3000/todos", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ text: "Apprendre Fastify" })
+})
+.then(r => r.json())
+.then(console.log)
+
+//voir notre base donne://
+fetch("http://localhost:3000/todos")
+  .then(r => r.json())
+  .then(console.log)
+
+
+//delete://
+ fetch("http://localhost:3000/todos/1", { method: "DELETE" })
+  .then(r => r.json())
+  .then(console.log) 
